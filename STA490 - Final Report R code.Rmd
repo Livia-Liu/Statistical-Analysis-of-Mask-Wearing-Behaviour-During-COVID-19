@@ -1,0 +1,313 @@
+---
+output:
+  pdf_document: null
+  includes:
+    in_header: latex/header.tex
+    before_body: latex/before_body.tex
+    after_body: latex/after_body.tex
+  html_document:
+    df_print: paged
+---
+
+```{r set up, echo=FALSE, include=FALSE, warning = FALSE}
+library(haven)
+library(tidyverse, quietly= TRUE)
+library(ggplot2)
+library(kableExtra)
+#library(gridExtra)
+library(gtable)
+library(knitr)
+#library(sf) #loading shp file
+#library(leaflet) #for spatial plotting
+#library(RColorBrewer) #for plotting heat map
+#library(spdep) #creating spatial neighbourhood matrix
+#library(sp) #convert dataframe to spatial polygon object
+#library(CARBayes) #for spatial modelling
+#library(INLA, verbose=FALSE)
+library(lme4)
+library(sjPlot)
+library(sjlabelled)
+library(sjmisc)
+
+#dat <- read_dta("~/Desktop/STA490/STA490_project_Mask_data_files_/data/meo_pooled_sharable.dta")
+m <- read.csv("/cloud/project/masks_data_v1.csv")
+```
+
+# Abstract
+
+Aiming to identify ways to increase effectiveness of policy published for curbing the spread of Covid-19, this report investigated possible socio-demographic predictors and attitudinal predictors for mask-wearing behaviour among Canadians, and whether people who choose to wore masks also took more other precautions than those who didn’t wore masks. The analysis had shown that female tend to have perform mask-wearing than all other genders, have higher income, higher educations, obtain trust toward public health professionals, taken the pandemic as a serious threat are also predictors of higher chance of wearing a mask. Trust in professionals in business discipline and those who related to the government have negative impact on chance of people wearing masks. Lastly, people who performed mask-wearing behaviour are likely to take more other precautions comparing to those who didn't work a mask.
+
+# Introduction
+
+Covid-19 had become a global pandemic since March 2020 and had brought dramatic change into people’s life. Almost all countries in the world had introduced policies aiming to curb the spread of this diseases as well as helping citizens to adopt the situation, these include asking citizens to stay home, avoid both domestic and international travel, wear masks when they visit public space and many others. Initiated by the Policy, Elections & Representation Lab ("PEARL") at the Munk School of Global Affairs and Public Policy, a series of surveys were conducted regarding public opinions toward politics and public policy during the pandemic. More specifically,with the aim of helping policymakers to publish more effective regulations to stop the pandemic, PEARL are interested in finding predictors that may influence people’s mask-wearing decision, which will be helpful for increasing effectiveness of policy published in the future.
+
+There were 18 waves of online surveys conducted from March till August 2020 targeting Canadian citizens that are above 18 years old, some questions had been modified as time progress and some new questions were added. The resulted dataset include 43272 responses and 2903 variables. This report will use these measurements to investigate possible socio-demographic and attitudinal predictors for mask-wearing behaviour. Another question will be discussed about is whether people who wore masks took more or fewer other precautions than those who don’t wear masks.
+
+The method section will explain some important data cleaning choices taken before fitting models. The two generalized linear mixed models employed to answer the research question will also be discussed in this section, which include the reason that they got chosen and contexts of the analysis. Answers to the research questions will be concluded in the result section accompanied by relevant statistics, tables and graphs will also be displayed to help communicate the results. Main findings obtained from the analysis will be explained in the context of research questions at the discussion section, any limitations about the statistical model used and suggestions for future analysis will be discussed in this section too. Finally, the appendix section will include the mathematical equation of the two models, as well as additional tables and figures that were relevant to the analysis and results.
+
+\newpage
+# Method 
+
+Before starting the statistical analysis process, data cleaning was implemented to ensure the accuracy of model build and to remove obstacles during the analysis as much as possible.
+
+After having a glimpse at the dataset, it is noticed that the mask wearing variable, which is the interested response variable, were added at the third wave of surveys. Thus, all observations collected before were not included in the subset of data used for fitting the model.
+The measuring scale of the variable correspond to respondents' opinion on seriousness of the COVID-19 pandemic originally marked 1 as very serious, and 4 as not serious at all. This scale was flipped in order to match with  scales of other attitudinal predictors and to make the resulted numbers more understandable.
+Moreover, since respondents were allowed to took multiple surveys across different waves, the repeated respid (the unique identification code assigned to each respondents) were removed to satisfy the independent assumption required for most models.
+
+## Model 1: Who is most likely to report using a mask?
+
+As wore mask or not is a binary response questions, which means it is not normally distributed, a generalized linear mixed  model with binomial family is going to be fitted for finding predictors of mask-wearing behaviour.
+The generalized linear model was chosen to allow more flexibility for the distribution of the response variable. Moreover, the reason for chosen the mixed model is that individual's mask-wearing decision can be affected by others living in the same neighborhood and regulations in each provinces, meaning it is possible for observations to be correlated within each area. To eliminate this regional effect, province was used as a random intercept in the fitted model. 
+
+Gender, age and education level of respondents were selected as possible socio-demographic predictors. Seriousness of the pandemic, and 12 variables measuring trust level toward professionals in different disciplines were selected as possible attitudinal predictors.
+Before actually fitting a model, factor analysis was used to categorize the 12 trust variables into 3 groups: trust level toward professionals related to public health, toward people related to business, and toward government (The specific numbers was shown in Table 1 at the Appendix). 
+Factor analysis is a technique that group variables based on their correlation with each other, new variables then can be created by combining values of variables that are grouped together. This was employed to reduce the large number of variables used in a model, which may be problematic as the model got too complicated.  
+
+
+## Model 2: Do people who wear masks take more or fewer other precautions than people who don’t wear masks?
+
+The response variable for this part is the amount of precautions a respondent had took, it is a non-negative numeric variable and a poisson family will be used for the model. 
+Similar as above, people's choice of taking precautions are related with the choice of those around them and the regional regulations, thus the correlation within each region need to be taken into consideration. As a result, a generalized linear mixed model using province as a random effect was fitted to solve the research question.
+
+A new variable was created as a sum of all the precautions took by each respondents other than wearing a mask, and it will act as the dependent variable for the model. The main predictor this report will focus on is the mask wearing variable, it was used as a categorical predictor in this model and values were converted to Yes or No. Other predictors chosen to provide additional information include gender, income, and education level.
+
+\newpage
+# Result
+```{r data cleaning, echo=FALSE}
+
+after3 <-subset(m, wave >=3)
+
+#Q10_12: mask wearing
+#Q5： Province
+#Q73: How serious of a threat do you think the coronavirus (COVID-19) is to Canadians? 1 = very
+#income: What was your total household income, before taxes, for the year 2018?
+  #1-no income; 8-high; NA = not willing to say
+#**interest** corresponds to Q14 on political interest
+#Q59_7: TRUST TOWARDS federal government, 1: distrust; 5:trust a lot; 6 = dont know
+#Q59_8: TRUST TOWARDS provincial government
+#Q63 To what extent do you approve or disapprove of the federal government's handling of the coronavirus pandemic so far? 1 = approv;4 = disapprove  
+#64 65 
+#Q82  employment status
+#Q79 What is the highest level of education that you have completed?
+
+re <- after3 %>%               #1 = wore mask, 0 = didn't
+  mutate(Q10_12 = case_when(
+    Q10_12 == TRUE ~ 1, 
+    wave >= 3 & is.na(Q10_12) == TRUE ~ 0,)) %>%
+  rename(mask = Q10_12)
+
+re <- re %>% rename(trust_exp = Q59_1, trust_eco = Q59_2, trust_sci = Q59_3, 
+                    trust_doc = Q59_4,trust_legal = Q59_5, trust_uni = Q59_6, trust_fed = Q59_7, 
+                    trust_prov = Q59_8, trust_phac = Q59_9, trust_border = Q59_10, trust_business = Q59_11, 
+                    trust_finance = Q59_12, approv_fed = Q63, seriousness = Q73)
+
+re <- re %>%
+  mutate(Q79= replace(Q79, Q79 == 12, NA)) %>%  #change those not willing to say
+  rename(education = Q79)
+
+re <- re %>%             # Gender
+  mutate(gender = case_when(
+    Q4 == 1 ~ "male", 
+    Q4 == 2 ~ "female",
+    Q4 == 3 ~ "other"
+  ))
+
+
+re <- re %>%     #change don't know to NA
+  mutate(trust_exp= replace(trust_exp, trust_exp == 6, NA)) %>% 
+  mutate(trust_eco= replace(trust_eco, trust_eco == 6, NA)) %>% 
+  mutate(trust_doc= replace(trust_doc, trust_doc == 6, NA)) %>% 
+  mutate(trust_legal= replace(trust_legal, trust_legal == 6, NA)) %>% 
+  mutate(trust_uni= replace(trust_uni, trust_uni == 6, NA)) %>% 
+  mutate(trust_fed= replace(trust_fed, trust_fed == 6, NA)) %>% 
+  mutate(trust_prov= replace(trust_prov, trust_prov == 6, NA)) %>% 
+  mutate(trust_phac= replace(trust_phac, trust_phac == 6, NA)) %>% 
+  mutate(trust_border= replace(trust_border, trust_border == 6, NA)) %>% 
+  mutate(trust_business= replace(trust_business, trust_business == 6, NA)) %>% 
+  mutate(trust_finance= replace(trust_finance, trust_finance == 6, NA)) %>% 
+  mutate(trust_sci= replace(trust_sci, trust_sci == 6, NA))
+
+re <- re %>%             # Flip grading scale for serious
+  mutate(seriousness = case_when(
+    seriousness == 1 ~ 4, 
+    seriousness == 2 ~ 3,
+    seriousness == 3 ~ 2,
+    seriousness == 4 ~ 1
+
+  ))
+
+
+dm = re[!duplicated(re$respid),]
+
+```
+
+```{r, echo=FALSE}
+#factor analysis
+trust <- cbind(dm$trust_exp,dm$trust_eco,dm$trust_sci,dm$trust_doc,dm$trust_legal,dm$trust_uni,dm$trust_fed,
+               dm$trust_prov,dm$trust_phac, dm$trust_border, dm$trust_business, dm$trust_finance)
+names(trust)=c('trust_exp','trust_eco','trust_sci','trust_doc','trust_legal','trust_uni', 'trust_fed',
+               'trust_prov','trust_phac', 'trust_border', 'trust_business','trust_finance')
+
+trust=na.omit(trust)
+trust_fact_anal = factanal(trust,3)
+#trust_fact_anal$loadings
+#g1：1,3,4,6,9 | g2:2,5,11,12 | g3:7,8,10
+
+#put trust variable into 3 groups based on factor analysis
+trust_health <- cbind(dm$trust_exp, dm$trust_sci, dm$trust_doc, dm$trust_uni, dm$trust_phac)
+trust_business <- cbind(dm$trust_eco, dm$trust_legal,dm$trust_business, dm$trust_finance)
+trust_government <-cbind(dm$trust_fed, dm$trust_prov, dm$trust_border)
+#get average score for each trust group
+trust_health_avg <- rowMeans(trust_health)  
+trust_business_avg <- rowMeans(trust_business)
+trust_government_avg <- rowMeans(trust_government)
+
+dm_g <-cbind(dm, trust_health_avg, trust_business_avg, trust_government_avg)
+```
+
+
+## Model 1
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+#glmm using  province as random effect
+library(glmmTMB)
+
+#dm_g$incomeC = dm_g$income - 1
+#dm_g$eduC = dm_g$edu - 1
+
+
+q1_glmm <-glmer(mask ~ gender + age + education + trust_health_avg + trust_business_avg + trust_government_avg 
+                + seriousness +  (1|Q5), data = dm_g, family=binomial())
+
+t1 <- summary(q1_glmm)$coefficients
+t1 <- cbind(t1, t1[,1])
+
+colnames(t1)<- c("Estimate","Std. Error","z value","Pr(>|z|)","OddsRatio")
+t1[,5] <- exp(t1[,1])
+
+#knitr::kable(t1, digits = 4, 
+ #                        cap="Parameter Estimation of GLMM Regaridng the Mask-wearing Behaviour")
+#%>% kable_styling(latex_options = "hold_position")
+```
+```{r, warning=FALSE, echo=FALSE, message=FALSE, fig.cap='GLMM Estimation and Confidence Interval Regaridng the Mask-wearing Behaviour \\newline Points respresent point estimate of parameters, lines aross them represent their 95% confidence interval, stars located after the numbers indicate the statistical significance of result', fig.height = 4, fig.width = 6}
+
+plot_model(q1_glmm, show.values = TRUE, show.intercept = TRUE,
+           value.offset = .3, value.size = 3, colors = "bw", digit =3,
+           dot.size = 1, 
+           title = "")
+```
+
+
+As shown in the figure 1 above, a 18 years old female had not completed any schooling, don't have any trust in any groups and don't think the pandemic is a serious threat will have about 3% chance to wore a mask. For socio-demographic predictors, keeping all other variables constant, male are about 27% less likely to choose wore mask and those marked their gender as other are 49% more likely to wore mask comparing to female, but the difference for other gender is not statistically significant with a p-value greater than 0.05. Moreover, people are more likely to have wore masks when they are more educated, and the chance for them wearing a mask increase as age increase, with the rate of about 1.5% each year of age. 
+Regarding attitudinal predictors, people are more likely to choose wore masks when they have more trust in public health professionals and think the pandemic is a serious situation, less likely to wore masks when they are more trusted in government and people related to business and government. Table 2 in the Appendix section provide more statistic including parameter estimation, standard error and p-values of the result. 
+
+In general, older female with high education level, trust a lot toward public health professionals and don't believe in the two other groups, and consider COVID-19 as a serious threat will be most likely to report using a mask.
+
+\newpage
+## Model 2
+
+```{r, warning=FALSE, echo=FALSE}
+data3 <- dm_g %>% 
+  rename(workhome = Q10_1, avoidcrowd = Q10_2, avoidpeaktimes = Q10_3, 
+         avoidcontact  = Q10_4, stockup= Q10_5, distance = Q10_6, virtual = Q10_7, 
+         onlineshop = Q10_8, avoidtravel = Q10_9, publictransit = Q10_10, stayhome = Q10_11, noprecaution = Q10_13)
+
+data3 <- data3 %>%               #1 = take the precautions, 0 = didn't
+  mutate(workhome = case_when(workhome == TRUE ~ 1, wave >= 3 & is.na(workhome) == TRUE ~ 0,)) %>%          
+  mutate(avoidcrowd = case_when(avoidcrowd == TRUE ~ 1, wave >= 3 & is.na(avoidcrowd) == TRUE ~ 0,)) %>%    
+  mutate(avoidpeaktimes = case_when(avoidpeaktimes == TRUE ~ 1, wave >= 3 & is.na(avoidpeaktimes) == TRUE ~ 0,)) %>%
+  mutate(avoidcontact = case_when(avoidcontact == TRUE ~ 1, wave >= 3 & is.na(avoidcontact) == TRUE ~ 0,)) %>%
+  mutate(stockup = case_when(stockup == TRUE ~ 1, wave >= 3 & is.na(stockup) == TRUE ~ 0,)) %>%               
+  mutate(distance = case_when(distance == TRUE ~ 1, wave >= 3 & is.na(distance) == TRUE ~ 0,)) %>%               
+  mutate(virtual = case_when(virtual == TRUE ~ 1, wave >= 3 & is.na(virtual) == TRUE ~ 0,)) %>%               
+  mutate(onlineshop = case_when(onlineshop == TRUE ~ 1, wave >= 3 & is.na(onlineshop) == TRUE ~ 0,)) %>%               
+  mutate(avoidtravel = case_when(avoidtravel == TRUE ~ 1, wave >= 3 & is.na(avoidtravel) == TRUE ~ 0,)) %>%    
+  mutate(publictransit = case_when(publictransit == TRUE ~ 1, wave >= 3 & is.na(publictransit) == TRUE ~ 0,)) %>%    
+  mutate(stayhome = case_when(stayhome == TRUE ~ 1, wave >= 3 & is.na(stayhome) == TRUE ~ 0,)) %>%    
+  mutate(noprecaution = case_when(noprecaution == TRUE ~ 1, wave >= 3 & is.na(noprecaution) == TRUE ~ 0,)) %>%    
+  mutate(mask = case_when(mask == 1 ~ "Y", mask != 1 ~ "N", ))
+
+#grep("workhome", colnames(data3))  #output 29
+#grep("stayhome", colnames(data3)) #output 39
+# precautions variables are stored in data3[29] to data3[39]
+
+data3$count_precautions <- apply(data3[29:39], 1, function(x) length(which(x==1)))
+
+#FIT MODEL
+
+q3 <-glmer(count_precautions ~ mask + gender +income+ education + (1|Q5), data = data3, family = poisson())
+
+t3 <-summary(q3)$coefficients
+t3 <- cbind(t3, t3[,1])
+
+colnames(t3)<- c("Estimate","Std. Error","z value","Pr(>|z|)","OddsRatio")
+t3[,5] <- exp(t3[,1])
+
+#knitr::kable(t3, digits = 4, cap="Parameter Estimation of GLMM About Number of Precautions Took") %>%
+#  kable_styling(latex_options = "hold_position")
+```
+
+```{r, warning=FALSE, echo=FALSE, message=FALSE, fig.cap='GLMM Estimation and Confidence Interval About Number of Precautions Took. \\newline Points in the figure respresent point estimate, lines aross them represent the 95% confidence interval, the stars located after the numbers indicate the statistical significance of result',fig.height = 2.5, fig.width = 6}
+
+plot_model(q3, show.values = TRUE, show.intercept = TRUE,
+           value.offset = .3, value.size = 3, colors = "bw", digit =3,
+           dot.size = 1, 
+           title = "",
+           wrap.title=70,axis.title = 'Odds Ratio'
+
+           )  
+#p2 + fig.cap(caption='The point respresent point estimate, lines aross them represent the 95% confidence interval')
+```
+
+As shown in Figure 2 above, female respondents that are 18 years old, don't have any income, had not completed any schooling, and didn't wore masks (referred as the baseline group) tend to take about 4 other precautions. A respondent with similar condition except wearing a mask will tend to take 1.3 times the number of precautions taken by those who didn't wear one, which will be about 6 precautions other than mask-wearing. Some other results include that male respondent tend to take 0.91 times the number of precautions taken by the baseline group, which is also approximately 4; those marked themselves as other genders take 0.93 times the number of precautions taken by female, but there are lack of statistical evidence to support this answer under a 5% significance level. Having higher income and higher education can also increase the chance of people taking more precautions,but the effect won’t make much difference since their estimation are about 1 times and 1.04 times the number of precautions taken by baseline group respectively.
+
+Table 3 in the Appendix section had provide more statistic including parameter estimation, standard error and p-values of the result.
+
+# Discussion
+
+In general, older female with high education level, trust a lot toward public health professionals, don't believe in business professionals or the government, and consider COVID-19 as a serious threat will be most likely to report using a mask. Moreover, people who performed mask-wearing behaviour are likely to take more other precautions comparing to those who didn't work a mask; gender, income and education don't seem to have a huge effect on people's choice to took more precautions or not.
+
+There are several limitations of the result obtained, a major one is that observations with repeated respid (the identification code for each respondents) were removed to obtain a valid model, the model will be more complete if all observations were included. Add respid as a random intercept might is the alternative way to keep the independent assumption of the model, but the lme4 package employed for this report wasn’t able to handle it. Fitting a Bayesian model from inla package with appropriate priors and other settings might solve this problem and this is the potential next step of analysis for the first research question.
+
+Another limitation of this analysis is that we have not specify priors for the random effect in both models and were using the default prior set by the package. If more time was allowed, the models could be benefitted and arrived at a more accurate result from using priors that are specifically chosen based on the data. More specifically, this could be solved by taking more time to test different priors by checking prior and posterior distribution of the data until finding the more suitable one.  
+
+\newpage
+
+# Appendix
+
+## Mathmatical Expresson of Models
+The equation for the first model is as the following:
+$$Y_i \sim Binomial(1, \mu_i)$$
+$$log(\frac{\mu_i}{1-\mu_i}) = \beta X + Province_i$$
+$Y_i$ is the dichotomous response variable representing whether the $i^{th}$ respondent had wore a mask or not, with 1 meaning a positive response and 0 the opposite. $\mu_i$ is the probability of $i^{th}$ respondent choose to wear a mask based on all the predictors. $X$ are the predictors as described in the method section and $\beta$ are their estimated coefficient. $Province_i$ is the fitted random effect.
+
+The equation for the second model is as the following:
+$$Y_i \sim Poisson(\mu_i)$$
+$$log(\mu_i) = \beta X + Province_i$$
+$Y_i$  is the number of precautions the $i^{th}$ respondent had took and $\mu_i$ is the average number of precautions took among all respondents.  $X$ are the predictors as described in the method section and $\beta$ are their estimated coefficient. $Province_i$ is the fitted random effect.
+
+## Relevant Tables
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+fac <- matrix(c(0.593,NA,0.218,0.362,0.638,0.155,0.789,0.159,0.159,
+                  0.668,0.160,0.259,0.301,0.549,0.252,0.565,0.315,0.198,
+                  0.350,0.266,0.592, 0.230, 0.321,0.498,0.640, 0.157, 0.484, 
+                  0.312 ,0.399,0.394 , NA, 0.626, 0.280, 0.297, 0.709, 0.138
+                  ),ncol=3,byrow=TRUE)
+colnames(fac) <- c("Factor 1","Factor 2","Factor 3")
+rownames(fac) <- c('trust_experts ','trust_economists ','trust_scientists ',
+                   'trust_doctors','trust_legal','trust_uni_professors', 'trust_federalgov',
+               'trust_provincial','trust_publichealth', 'trust_border', 'trust_business','trust_financial')
+fac <- as.table(fac)
+
+#g1：1,3,4,6,9 | g2:2,5,11,12 | g3:7,8,10
+
+knitr::kable(fac, digits = 3, cap="Result of Factor Analysis")%>%
+  kable_styling(latex_options = "hold_position")
+
+knitr::kable(t1, digits = 4, cap="Parameter Estimation of GLMM Regaridng the Mask-wearing Behaviour (Model 1)")%>%
+  kable_styling(latex_options = "hold_position")
+
+knitr::kable(t3, digits = 4, cap="Parameter Estimation of GLMM About Number of Precautions Took (Model 2)") %>%
+  kable_styling(latex_options = "hold_position")
+
+```
+
